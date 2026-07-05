@@ -48,9 +48,11 @@
   ::selection{background:var(--amber);color:#1a1206}
 
   #app{
-    position:fixed;inset:0;
-    max-width:520px;margin:0 auto;
+    position:relative;
+    width:100%;max-width:520px;margin:0 auto;
+    height:100dvh;min-height:520px;   /* real flow height so embeds don't collapse */
     display:flex;flex-direction:column;
+    overflow:hidden;
     background:
       radial-gradient(120% 80% at 50% -10%, #2a2013 0%, transparent 55%),
       radial-gradient(100% 60% at 50% 110%, #211812 0%, transparent 60%),
@@ -58,6 +60,7 @@
     padding-top:env(safe-area-inset-top);
     padding-bottom:env(safe-area-inset-bottom);
   }
+  @supports not (height:100dvh){ #app{height:100vh} }
 
   /* ---------- top bar ---------- */
   .topbar{
@@ -529,6 +532,20 @@ let cameraStream = null;
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
+
+// Lock the app to the real viewport height. Falls back to the CSS floor
+// (min-height) when embedded in a frame that reports no usable height.
+function fitApp(){
+  let h = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
+  // Some embeds report no usable height (a frame sized to content). Fall back
+  // to the device screen height so the app fills the screen instead of collapsing.
+  if(h < 300){ try{ h = window.screen.availHeight || window.screen.height || 640; }catch{ h = 640; } }
+  const app = document.getElementById('app');
+  if(app) app.style.height = h + 'px';
+}
+fitApp();
+window.addEventListener('resize', fitApp);
+if(window.visualViewport) window.visualViewport.addEventListener('resize', fitApp);
 const rarityRank = {Common:0,Uncommon:1,Rare:2,Legendary:3};
 
 /* =========================================================================
