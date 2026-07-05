@@ -511,9 +511,14 @@ const DINOS = [
 /* =========================================================================
    STATE
    ========================================================================= */
+// Storage that never throws — falls back to memory when localStorage is
+// blocked (sandboxed iframes, private browsing, etc.)
+const _mem = {};
+function _get(k){ try{ return localStorage.getItem(k); }catch{ return (k in _mem)?_mem[k]:null; } }
+function _set(k,v){ try{ localStorage.setItem(k,v); }catch{ _mem[k]=v; } }
 const store = {
-  get caught(){try{return new Set(JSON.parse(localStorage.getItem('dg_caught')||'[]'))}catch{return new Set()}},
-  set caught(s){localStorage.setItem('dg_caught',JSON.stringify([...s]))}
+  get caught(){try{return new Set(JSON.parse(_get('dg_caught')||'[]'))}catch{return new Set()}},
+  set caught(s){ try{ _set('dg_caught',JSON.stringify([...s])); }catch{} }
 };
 let caught = store.caught;
 let spawns = [];           // {dino, bearing, distance, capturable}
