@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Dinosaur Go — Field Tracker</title>
+<meta name="description" content="Hunt living dinosaurs in augmented reality. A paleo field tracker for your phone." />
+<meta name="theme-color" content="#17120C" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Dinosaur Go" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ground:#17120C;
+    --ground-2:#1e1710;
+    --panel:#241b11;
+    --panel-2:#2e2416;
+    --line:#8c6a32;
+    --line-soft:rgba(140,106,50,.28);
+    --bone:#efe6d2;
+    --bone-dim:#b8ad96;
+    --amber:#f2a73b;
+    --amber-deep:#c8811f;
+    --ember:#e4572e;
+    --fern:#5fa463;
+    --violet:#9b7fd4;
+    --radius:14px;
+    --shadow:0 18px 40px -18px rgba(0,0,0,.8);
+    --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+    --sans:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --serif:"Fraunces",Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:var(--sans);
+    background:var(--ground);
+    color:var(--bone);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+    overscroll-behavior:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
+  ::selection{background:var(--amber);color:#1a1206}
+
+  #app{
+    position:fixed;inset:0;
+    max-width:520px;margin:0 auto;
+    display:flex;flex-direction:column;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #2a2013 0%, transparent 55%),
+      radial-gradient(100% 60% at 50% 110%, #211812 0%, transparent 60%),
+      var(--ground);
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:.6rem;
+    padding:.7rem 1rem .55rem;
+    border-bottom:1px solid var(--line-soft);
+    flex-shrink:0;
+  }
+  .mark{
+    width:34px;height:34px;flex-shrink:0;
+    display:grid;place-items:center;
+    border:1px solid var(--line);border-radius:9px;
+    background:linear-gradient(160deg,#2b2114,#1c150d);
+    color:var(--amber);
+  }
+  .mark svg{width:22px;height:22px}
+  .wordmark{display:flex;flex-direction:column;line-height:1;gap:2px}
+  .wordmark b{
+    font-family:var(--serif);font-weight:900;font-size:1.12rem;letter-spacing:.01em;
+  }
+  .wordmark b span{color:var(--amber)}
+  .wordmark small{
+    font-family:var(--mono);font-size:.56rem;letter-spacing:.28em;text-transform:uppercase;
+    color:var(--bone-dim);
+  }
+  .status{
+    margin-left:auto;display:flex;gap:.9rem;font-family:var(--mono);font-size:.6rem;
+    color:var(--bone-dim);text-align:right;
+  }
+  .status .k{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+  .status .k b{color:var(--bone);font-size:.82rem;font-weight:700}
+  .status .dot{color:var(--fern)}
+  .status .dot.warn{color:var(--amber)}
+
+  /* ---------- screens ---------- */
+  main{flex:1;position:relative;overflow:hidden}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;
+    opacity:0;visibility:hidden;transform:translateY(8px);
+    transition:opacity .3s ease,transform .3s ease,visibility .3s;}
+  .screen.active{opacity:1;visibility:visible;transform:none}
+  .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+
+  /* ---------- START / onboarding ---------- */
+  #start{justify-content:center;align-items:center;text-align:center;padding:1.6rem;gap:1.1rem;
+    background:radial-gradient(130% 90% at 50% 20%, #2c2114 0%, var(--ground) 60%);}
+  #start .badge{font-family:var(--mono);font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;
+    color:var(--amber);border:1px solid var(--line);border-radius:100px;padding:.4rem .9rem}
+  #start h1{font-family:var(--serif);font-weight:900;font-size:clamp(2.6rem,13vw,3.6rem);
+    line-height:.92;margin:.2rem 0 0;text-wrap:balance}
+  #start h1 span{color:var(--amber)}
+  #start p{max-width:31ch;color:var(--bone-dim);font-size:.95rem;line-height:1.5;margin:0}
+  .startdino{width:min(74%,300px);color:var(--amber);opacity:.92;
+    filter:drop-shadow(0 14px 26px rgba(0,0,0,.6));margin:.2rem 0}
+  .cta{background:linear-gradient(160deg,var(--amber),var(--amber-deep));color:#20160a;
+    font-weight:700;font-size:1.02rem;padding:.95rem 1.4rem;border-radius:12px;width:min(100%,320px);
+    box-shadow:0 12px 26px -10px rgba(242,167,59,.6);letter-spacing:.01em}
+  .cta:active{transform:translateY(1px)}
+  .perms{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;font-family:var(--mono);
+    font-size:.6rem;color:var(--bone-dim);letter-spacing:.05em}
+  .perms span{border:1px solid var(--line-soft);border-radius:100px;padding:.35rem .7rem}
+
+  /* ---------- RADAR ---------- */
+  #radar .scroll{padding:1rem 1rem 6rem;display:flex;flex-direction:column;gap:1rem}
+  .radar-wrap{position:relative;width:min(86vw,340px);aspect-ratio:1;margin:.4rem auto 0}
+  .radar-wrap canvas{width:100%;height:100%;display:block}
+  .radar-center-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    font-family:var(--mono);font-size:.54rem;letter-spacing:.18em;color:var(--bone-dim);
+    text-transform:uppercase;pointer-events:none;text-align:center;line-height:1.5}
+  .sec-head{display:flex;align-items:baseline;gap:.6rem;padding:0 .1rem}
+  .sec-head h2{font-family:var(--serif);font-weight:600;font-size:1.15rem;margin:0}
+  .sec-head .count{font-family:var(--mono);font-size:.62rem;color:var(--bone-dim);letter-spacing:.1em;margin-left:auto}
+  .nearby{display:flex;flex-direction:column;gap:.55rem}
+  .track-card{display:flex;align-items:center;gap:.85rem;background:linear-gradient(150deg,var(--panel),var(--ground-2));
+    border:1px solid var(--line-soft);border-radius:var(--radius);padding:.7rem .8rem;text-align:left;width:100%}
+  .track-card:active{border-color:var(--line)}
+  .track-card .sil{width:52px;height:40px;flex-shrink:0;display:grid;place-items:center;
+    border-radius:9px;background:rgba(0,0,0,.25)}
+  .track-card .sil svg{width:100%;height:100%}
+  .track-card .info{flex:1;min-width:0}
+  .track-card .info .nm{font-family:var(--serif);font-weight:600;font-size:1.02rem;line-height:1.1}
+  .track-card .info .meta{font-family:var(--mono);font-size:.62rem;color:var(--bone-dim);
+    display:flex;gap:.5rem;margin-top:3px;flex-wrap:wrap}
+  .track-card .dist{text-align:right;flex-shrink:0}
+  .track-card .dist b{font-family:var(--mono);font-size:1.05rem;font-weight:700;display:block}
+  .track-card .dist small{font-family:var(--mono);font-size:.55rem;color:var(--amber);letter-spacing:.12em;text-transform:uppercase}
+  .rar{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:.55rem;
+    text-transform:uppercase;letter-spacing:.1em}
+  .rar::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
+  .rar.Common{color:var(--fern)} .rar.Uncommon{color:var(--amber)}
+  .rar.Rare{color:var(--violet)} .rar.Legendary{color:var(--ember)}
+  .empty{text-align:center;color:var(--bone-dim);font-size:.85rem;padding:1.4rem;font-style:italic}
+  .rescan{align-self:center;font-family:var(--mono);font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--amber);border:1px solid var(--line);border-radius:100px;padding:.6rem 1.2rem}
+  .rescan:active{background:rgba(242,167,59,.12)}
+
+  /* ---------- AR ENCOUNTER ---------- */
+  #ar{background:#0b0906}
+  #ar-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+  #ar-fallback{position:absolute;inset:0;z-index:0;display:none;
+    background:
+      radial-gradient(120% 60% at 30% 8%, rgba(242,167,59,.20), transparent 55%),
+      linear-gradient(180deg,#241a24 0%,#3a2a20 42%,#4c3320 60%,#2a1c12 100%);
+    overflow:hidden}
+  #ar-fallback::before{content:"";position:absolute;left:-10%;right:-10%;bottom:-6%;height:46%;
+    background:radial-gradient(90% 100% at 50% 100%, #1c1109, transparent 72%);}
+  .parallax-hill{position:absolute;bottom:0;left:-5%;right:-5%;height:38%;
+    background:#20140c;border-radius:50% 50% 0 0/100% 100% 0 0;}
+  .parallax-hill.back{bottom:26%;height:26%;background:#33221a;left:-20%;right:20%;opacity:.8}
+  .fog{position:absolute;inset:0;background:radial-gradient(closest-side at 50% 78%, transparent, rgba(11,9,6,.7));z-index:1}
+  #ar-scene{position:absolute;inset:0;z-index:2;overflow:hidden}
+  .ar-dino{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);
+    color:#241811;filter:drop-shadow(0 10px 22px rgba(0,0,0,.6)) drop-shadow(0 0 2px rgba(242,167,59,.9));
+    transition:transform .5s cubic-bezier(.2,.7,.3,1);animation:bob 3.4s ease-in-out infinite}
+  .ar-dino svg{display:block;width:100%;height:100%}
+  @keyframes bob{0%,100%{translate:0 0}50%{translate:0 -3%}}
+  .ar-hud{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;pointer-events:none}
+  .ar-top{display:flex;align-items:flex-start;gap:.6rem;padding:.9rem;pointer-events:auto}
+  .ar-back{width:38px;height:38px;border-radius:50%;background:rgba(11,9,6,.55);
+    border:1px solid var(--line-soft);display:grid;place-items:center;backdrop-filter:blur(6px)}
+  .ar-back svg{width:18px;height:18px}
+  .ar-tag{background:rgba(11,9,6,.55);border:1px solid var(--line-soft);border-radius:100px;
+    padding:.5rem .85rem;backdrop-filter:blur(6px)}
+  .ar-tag .nm{font-family:var(--serif);font-weight:600;font-size:1rem;line-height:1}
+  .ar-tag .sub{font-family:var(--mono);font-size:.56rem;color:var(--bone-dim);letter-spacing:.1em;margin-top:3px}
+  .ar-compass{margin-left:auto;text-align:right;font-family:var(--mono);font-size:.56rem;color:var(--bone-dim);
+    background:rgba(11,9,6,.55);border:1px solid var(--line-soft);border-radius:10px;padding:.45rem .6rem;backdrop-filter:blur(6px)}
+  .ar-compass b{color:var(--amber);font-size:.9rem;display:block}
+  .reticle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(64vw,260px);aspect-ratio:1;pointer-events:none;z-index:3;opacity:.9}
+  .reticle svg{width:100%;height:100%;color:var(--amber);animation:spin 14s linear infinite}
+  @keyframes spin{to{rotate:360deg}}
+  .ar-bottom{margin-top:auto;padding:1rem 1rem calc(1.1rem + env(safe-area-inset-bottom));pointer-events:auto;
+    display:flex;flex-direction:column;gap:.7rem;
+    background:linear-gradient(0deg,rgba(11,9,6,.85),transparent)}
+  .rangebar{height:6px;border-radius:100px;background:rgba(255,255,255,.14);overflow:hidden}
+  .rangebar i{display:block;height:100%;background:linear-gradient(90deg,var(--ember),var(--amber),var(--fern));
+    border-radius:100px;transition:width .35s ease}
+  .range-label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.6rem;color:var(--bone-dim);letter-spacing:.08em}
+  .range-label b{color:var(--bone)}
+  .ar-actions{display:flex;gap:.6rem}
+  .btn{flex:1;padding:.95rem;border-radius:12px;font-weight:700;font-size:.98rem;text-align:center;
+    border:1px solid var(--line);background:rgba(20,15,9,.6);backdrop-filter:blur(6px);letter-spacing:.01em}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(160deg,var(--amber),var(--amber-deep));color:#20160a;border-color:transparent;
+    box-shadow:0 10px 22px -10px rgba(242,167,59,.6)}
+  .btn.primary:disabled{background:rgba(60,48,30,.6);color:var(--bone-dim);box-shadow:none;cursor:not-allowed}
+  .btn.primary:disabled:active{transform:none}
+
+  /* capture flash */
+  .flash{position:absolute;inset:0;z-index:6;background:#fff;opacity:0;pointer-events:none}
+  .flash.go{animation:flash .5s ease}
+  @keyframes flash{0%{opacity:0}18%{opacity:.9}100%{opacity:0}}
+
+  /* success card */
+  #capture-card{position:absolute;inset:0;z-index:7;display:none;align-items:center;justify-content:center;
+    background:rgba(11,9,6,.78);backdrop-filter:blur(8px);padding:1.3rem}
+  #capture-card.show{display:flex;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .cap-inner{background:linear-gradient(160deg,var(--panel-2),var(--ground-2));border:1px solid var(--line);
+    border-radius:20px;padding:1.4rem 1.2rem;text-align:center;max-width:340px;width:100%;box-shadow:var(--shadow)}
+  .cap-inner .stamp{font-family:var(--mono);font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--fern)}
+  .cap-inner .sil{width:130px;height:100px;margin:.4rem auto;color:var(--amber)}
+  .cap-inner .sil svg{width:100%;height:100%}
+  .cap-inner h3{font-family:var(--serif);font-weight:900;font-size:1.7rem;margin:.1rem 0 0}
+  .cap-inner .latin{font-family:var(--serif);font-style:italic;color:var(--bone-dim);font-size:.9rem}
+  .cap-inner .fact{font-size:.86rem;line-height:1.5;color:var(--bone-dim);margin:.7rem 0 1rem}
+
+  /* ---------- DEX ---------- */
+  #dex .scroll{padding:1rem 1rem 6rem}
+  .dex-head{display:flex;align-items:flex-end;gap:.7rem;margin-bottom:.9rem}
+  .dex-head h2{font-family:var(--serif);font-weight:900;font-size:1.7rem;margin:0;line-height:1}
+  .dex-progress{margin-left:auto;text-align:right;font-family:var(--mono);font-size:.6rem;color:var(--bone-dim)}
+  .dex-progress b{color:var(--amber);font-size:1.3rem;display:block}
+  .dex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+  .dex-cell{position:relative;aspect-ratio:.82;border-radius:12px;overflow:hidden;
+    border:1px solid var(--line-soft);background:linear-gradient(160deg,var(--panel),var(--ground-2));
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.5rem;text-align:center}
+  .dex-cell.locked{opacity:.55}
+  .dex-cell .num{position:absolute;top:6px;left:8px;font-family:var(--mono);font-size:.55rem;color:var(--bone-dim)}
+  .dex-cell .rdot{position:absolute;top:7px;right:8px;width:8px;height:8px;border-radius:2px}
+  .dex-cell .sil{width:74%;height:56%;display:grid;place-items:center}
+  .dex-cell .sil svg{width:100%;height:100%}
+  .dex-cell.owned .sil{color:var(--amber)} .dex-cell.locked .sil{color:#4a3a26}
+  .dex-cell .lbl{font-family:var(--serif);font-weight:600;font-size:.74rem;line-height:1.05;margin-top:.3rem}
+  .dex-cell.locked .lbl{color:var(--bone-dim);font-style:italic}
+
+  /* ---------- DETAIL ---------- */
+  #detail .scroll{padding:0 0 6rem}
+  .detail-hero{position:relative;padding:2.2rem 1.2rem 1.3rem;
+    background:radial-gradient(120% 80% at 70% 0%, #33261520, transparent 60%),linear-gradient(160deg,var(--panel-2),var(--ground));
+    border-bottom:1px solid var(--line-soft)}
+  .detail-back{position:absolute;top:.9rem;left:.9rem;width:38px;height:38px;border-radius:50%;
+    background:rgba(11,9,6,.4);border:1px solid var(--line-soft);display:grid;place-items:center}
+  .detail-back svg{width:18px;height:18px}
+  .detail-hero .sil{width:min(70%,240px);height:150px;margin:.4rem auto .3rem;color:var(--amber);
+    filter:drop-shadow(0 12px 22px rgba(0,0,0,.5))}
+  .detail-hero .sil svg{width:100%;height:100%}
+  .detail-hero h2{font-family:var(--serif);font-weight:900;font-size:2rem;text-align:center;margin:.2rem 0 0;text-wrap:balance}
+  .detail-hero .latin{font-family:var(--serif);font-style:italic;text-align:center;color:var(--bone-dim);font-size:.95rem}
+  .detail-hero .pron{font-family:var(--mono);text-align:center;color:var(--amber);font-size:.62rem;letter-spacing:.12em;margin-top:4px}
+  .detail-hero .rar{justify-content:center;display:flex;margin-top:.6rem}
+  .specs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-soft);
+    border-bottom:1px solid var(--line-soft)}
+  .spec{background:var(--ground);padding:.8rem 1rem}
+  .spec .k{font-family:var(--mono);font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;color:var(--bone-dim)}
+  .spec .v{font-family:var(--serif);font-weight:600;font-size:1.05rem;margin-top:3px}
+  .spec .v small{font-family:var(--mono);font-weight:400;font-size:.62rem;color:var(--bone-dim);display:block;margin-top:1px}
+  .detail-body{padding:1.2rem}
+  .detail-body h3{font-family:var(--mono);font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .5rem;display:flex;align-items:center;gap:.5rem}
+  .detail-body h3::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+  .detail-body p{line-height:1.6;font-size:.94rem;color:#ddd2ba;margin:0 0 1.3rem}
+  .discovery{background:linear-gradient(160deg,var(--panel),var(--ground-2));border:1px solid var(--line-soft);
+    border-radius:var(--radius);padding:1rem;margin-bottom:1.3rem}
+  .worldmap{width:100%;display:block;border-radius:9px;background:#120d08;margin-bottom:.7rem}
+  .discovery .loc{font-family:var(--serif);font-weight:600;font-size:1.1rem}
+  .discovery .coord{font-family:var(--mono);font-size:.68rem;color:var(--amber);letter-spacing:.06em;margin-top:2px}
+  .factlist{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem}
+  .factlist li{list-style:none;display:flex;gap:.6rem;font-size:.9rem;line-height:1.45;color:#ddd2ba}
+  .factlist li::before{content:"◆";color:var(--amber);flex-shrink:0;font-size:.7rem;margin-top:.2rem}
+  ul.factlist{padding:0;margin:0 0 1.3rem}
+
+  /* ---------- tabbar ---------- */
+  .tabbar{display:flex;flex-shrink:0;border-top:1px solid var(--line-soft);background:rgba(20,15,9,.92);
+    backdrop-filter:blur(10px);padding-bottom:env(safe-area-inset-bottom)}
+  .tab{flex:1;padding:.6rem 0 .55rem;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--bone-dim)}
+  .tab svg{width:23px;height:23px}
+  .tab span{font-family:var(--mono);font-size:.54rem;letter-spacing:.12em;text-transform:uppercase}
+  .tab.active{color:var(--amber)}
+  .tab.hunt{position:relative}
+  .tab.hunt .huntbtn{width:52px;height:52px;margin-top:-18px;border-radius:50%;
+    background:linear-gradient(160deg,var(--amber),var(--amber-deep));display:grid;place-items:center;
+    box-shadow:0 8px 20px -6px rgba(242,167,59,.6);border:3px solid var(--ground)}
+  .tab.hunt .huntbtn svg{width:24px;height:24px;color:#20160a}
+  .tab.hunt span{color:var(--amber)}
+
+  .hidden{display:none !important}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important;transition-duration:.05ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- top bar -->
+  <header class="topbar" id="topbar">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 15c1.6 0 2.5-1.2 3.4-2.4C7.2 11.6 8 10 10 10c1 0 1.6.4 2.3.9.4-1.1 1.2-2.2 2.4-2.7-.5-.5-.8-1.2-.6-2 .3-1.1 1.4-1.8 2.5-1.6.4.1.7.3 1 .5.2-.5.7-.9 1.3-.9.8 0 1.4.6 1.4 1.4 0 .5-.3 1-.7 1.2 1 .6 1.7 1.7 1.7 3 0 .5-.1 1-.3 1.4l1.3.6c.2.1.3.3.2.5l-.5 1c-.1.2-.3.3-.5.2l-1.4-.5c-.5.6-1.1 1-1.9 1.2V17c0 .6-.4 1-1 1s-1-.4-1-1v-1h-2v1c0 .6-.4 1-1 1s-1-.4-1-1v-1.3c-1.6-.5-2.6-1.7-3.4-1.7-1 0-1.6 1-2.5 2C5.6 16.3 4.6 17 3 17V15zm14.5-6.5c.4 0 .8-.3.8-.8s-.3-.7-.8-.7-.7.3-.7.7.3.8.7.8z"/></svg>
+    </div>
+    <div class="wordmark">
+      <b>Dinosaur <span>Go</span></b>
+      <small>Field Tracker</small>
+    </div>
+    <div class="status" id="status">
+      <div class="k"><span class="dot" id="gps-dot">● GPS</span><b id="gps-val">—</b></div>
+      <div class="k"><span>Caught</span><b id="caught-val">0/12</b></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- START -->
+    <section class="screen active" id="start">
+      <span class="badge">Cretaceous Field Unit · Est. 66 Mya</span>
+      <div class="startdino" id="start-dino"></div>
+      <h1>See real dinosaurs<br><span>in your world.</span></h1>
+      <p>Point your phone outside and track prehistoric giants in augmented reality. Every catch is a real species with real facts about where it once roamed.</p>
+      <button class="cta" id="begin-btn">Begin the hunt</button>
+      <div class="perms">
+        <span>📷 Camera for AR</span>
+        <span>📍 Location for tracking</span>
+        <span>🧭 Compass to aim</span>
+      </div>
+    </section>
+
+    <!-- RADAR -->
+    <section class="screen" id="radar">
+      <div class="scroll">
+        <div class="radar-wrap">
+          <canvas id="radar-canvas" width="680" height="680"></canvas>
+          <div class="radar-center-label">YOU<br><span id="radar-coord">locating…</span></div>
+        </div>
+        <div class="sec-head">
+          <h2>Nearby specimens</h2>
+          <span class="count" id="nearby-count">0 detected</span>
+        </div>
+        <div class="nearby" id="nearby-list"></div>
+        <button class="rescan" id="rescan-btn">↻ Rescan area</button>
+      </div>
+    </section>
+
+    <!-- AR ENCOUNTER -->
+    <section class="screen" id="ar">
+      <video id="ar-video" autoplay playsinline muted></video>
+      <div id="ar-fallback">
+        <div class="parallax-hill back"></div>
+        <div class="parallax-hill"></div>
+      </div>
+      <div class="fog"></div>
+      <div id="ar-scene"><div class="ar-dino" id="ar-dino"></div></div>
+      <div class="reticle" id="reticle"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="50" cy="50" r="34" stroke-dasharray="4 6" opacity=".8"/>
+        <circle cx="50" cy="50" r="46" stroke-dasharray="1 9"/>
+        <path d="M50 8v12M50 80v12M8 50h12M80 50h12" stroke-width="2"/>
+      </svg></div>
+      <div class="ar-hud">
+        <div class="ar-top">
+          <button class="ar-back" id="ar-back" aria-label="Back to radar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <div class="ar-tag">
+            <div class="nm" id="ar-name">—</div>
+            <div class="sub" id="ar-sub">tracking…</div>
+          </div>
+          <div class="ar-compass"><span id="ar-heading-lbl">HEADING</span><b id="ar-heading">--°</b></div>
+        </div>
+        <div class="ar-bottom">
+          <div class="range-label"><span>DISTANCE</span><b id="ar-dist">— m</b></div>
+          <div class="rangebar"><i id="ar-range"></i></div>
+          <div class="ar-actions">
+            <button class="btn" id="approach-btn">Approach ↑</button>
+            <button class="btn primary" id="capture-btn" disabled>Get closer…</button>
+          </div>
+        </div>
+      </div>
+      <div class="flash" id="flash"></div>
+      <div id="capture-card">
+        <div class="cap-inner">
+          <div class="stamp">✦ Specimen secured ✦</div>
+          <div class="sil" id="cap-sil"></div>
+          <h3 id="cap-name">—</h3>
+          <div class="latin" id="cap-latin">—</div>
+          <p class="fact" id="cap-fact">—</p>
+          <button class="cta" id="cap-view">View field notes</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEX -->
+    <section class="screen" id="dex">
+      <div class="scroll">
+        <div class="dex-head">
+          <h2>Dinodex</h2>
+          <div class="dex-progress"><b id="dex-pct">0%</b>collection</div>
+        </div>
+        <div class="dex-grid" id="dex-grid"></div>
+      </div>
+    </section>
+
+    <!-- DETAIL -->
+    <section class="screen" id="detail">
+      <div class="scroll" id="detail-scroll"></div>
+    </section>
+  </main>
+
+  <!-- tab bar -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" data-go="radar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+      <span>Radar</span>
+    </button>
+    <button class="tab hunt" data-go="hunt">
+      <div class="huntbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/><circle cx="12" cy="12" r="3.2"/></svg></div>
+      <span>Hunt</span>
+    </button>
+    <button class="tab" data-go="dex">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a2 2 0 012 2v13a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><path d="M9 4v16M5 8h4M5 12h4M5 16h4"/></svg>
+      <span>Dinodex</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+/* =========================================================================
+   DINOSAUR GO — data
+   Silhouettes: stylised side-profile field-guide shapes (viewBox 0 0 200 120)
+   ========================================================================= */
+const SIL = {
+  theropod:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M181 22c-4-3-10-3-15 0-3-9-11-9-15-4-3-8-12-9-18-3-7 6-6 14-1 19-6 1-12 5-15 12-4 9-4 19-14 24-8 4-18 3-27 3-3-6-8-6-9-1-1 4 2 7 6 8-3 5-1 12 5 13l1 11c0 3 4 3 5 0l2-9c4 0 8-1 11-3l3 12c1 3 5 2 5-1l-1-14c9-4 15-12 18-21 8 2 16 0 22-6 3 4 8 5 12 3l-2 8c-1 3 3 4 5 2l6-9c5-1 9-5 10-11 4-2 7-6 7-11 0-9-6-16-13-18 3-3 4-6 2-9z"/></svg>',
+  sauropod:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M14 96c-3 0-5-3-4-6 2-9 9-15 18-18-2-8 0-17 6-24 5-6 13-9 20-8 1-6 5-11 11-14 8-4 18-3 24 3 2-2 5-1 5 2 0 2-2 4-4 4-1 0-2 0-3-1-4-3-10-3-14 0-3 2-5 6-5 9 9 3 15 11 16 21 1 11-4 21-13 27 3 5 5 11 5 17l4 8c1 3-3 5-5 2l-4-7c-6 4-13 6-20 5l2 8c1 3-3 4-5 2l-5-11c-6-2-11-6-14-11-6 1-11 5-13 11-1 3-2 4-2 4h-3l3-9c-2 0-4 1-6 2-3 2-7 3-11 3z"/></svg>',
+  stego:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M18 92c-3 1-6-2-4-5 3-6 9-9 15-10-1-14 8-27 22-31l4-9c1-3 5-1 4 2l-1 5c5-1 10-1 15 1l4-8c2-3 5 0 4 3l-2 6c6 3 10 8 12 14 4-6 9-6 12-1 3-6 9-6 12 0 3-5 9-5 12 1 3-4 8-3 9 1 5-3 11 2 9 8-2 5-8 6-12 3-1 5-7 6-11 2-2 5-8 6-12 2-2 4-7 5-11 2-3 4-7 5-11 3-3 6-9 10-16 11l3 9c1 3-3 5-5 2l-5-10c-6 0-11-2-16-6-4 4-9 6-15 5l1 5c1 3-4 4-5 1l-4-9c-6-1-11-4-13-9z"/></svg>',
+  cerat:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M13 90c-3 0-5-3-3-6 3-6 9-9 15-9-1-15 8-29 23-33-6-8-4-19 4-23-2-3 0-6 3-6 2 0 4 2 4 4l-1 3c5-1 10 1 14 5l6-10c2-3 6 0 4 3l-4 9c8-2 16 2 19 10 5-4 12-4 17 1 3-4 8-2 8 2 0 2-1 3-3 4-4 1-9 0-11-3-4 4-11 5-16 1-1 8-7 15-15 17 2 5 3 11 2 16l4 8c1 3-3 5-5 2l-4-8c-6 2-12 1-17-2l1 8c0 3-4 4-5 1l-4-11c-6-3-10-8-11-14-6 0-12-3-16-8-5 4-9 10-11 16-1 3-2 5-2 5l-3-1 2-8c-2 1-4 2-6 3-4 2-9 3-13 3z"/></svg>',
+  anky:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M12 84c-3 0-5-4-2-6 8-7 19-9 29-6 3-12 13-21 25-23 3-1 5-1 8-1 2-4 6-6 11-6 6 0 11 4 12 10 6 1 11 6 12 12l16 5c6 2 10 8 8 14-1 4-5 6-9 5l-16-6c-5 4-11 5-17 3-2 5-7 8-13 8-9 0-16-6-18-14-9 3-19 2-27-3l1 6c1 3-3 4-5 1l-4-8c-5-1-9 0-13 3-2 2-4 3-8 3z"/><circle cx="150" cy="94" r="9" fill="none" stroke="currentColor" stroke-width="0"/></svg>',
+  raptor:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M188 20c-2-3-7-3-9 0-4-6-11-5-14 0-2-5-9-6-13-1-4 4-3 10 1 13-8 2-14 8-16 16-2 7-1 15-7 20-4 4-10 4-15 4l-8 6c-2 2-5-1-3-4l4-5c-4 0-7-2-9-6-2 2-6 1-6-2 0-2 2-4 4-3l3 1c0-5 3-9 8-11-4-3-6-8-5-13 1-3 4-6 8-7-3 6 0 12 5 14 5 2 11 0 14-4 6 3 13 2 18-3 2 3 6 3 9 1l-1 6c-1 3 3 4 5 1l4-7c5-1 8-5 9-10 3-2 6-5 6-9 0-3-1-5-2-7 2-1 3-3 2-5l8 5c3 2 5-2 3-5z"/></svg>',
+  ptero:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M100 40c4 0 8-2 10-6 3 4 8 5 13 5 18 0 45-8 65-24 2-2 5 0 4 3-6 15-22 27-40 32 12 2 24 7 33 15 2 2 0 6-3 5-16-6-33-8-50-6-6 1-11 4-14 9-3-5-8-8-14-9-17-2-34 0-50 6-3 1-5-3-3-5 9-8 21-13 33-15C67 40 51 28 45 13c-1-3 2-5 4-3 20 16 47 24 65 24 5 0 10-1 13-5 2 4 6 6 10 6l-4 6c-2 3-6 5-10 5s-8-2-10-5z"/></svg>',
+  hadro:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M14 94c-3 0-5-3-3-6 3-6 9-9 15-9-2-9 1-19 8-25 6-6 15-8 23-6 0-8 3-15 9-20 4-4 9-5 13-3l6-8c2-3 6 0 4 3l-5 9c3 4 4 9 3 14 6 3 10 9 11 16 1 10-3 20-12 26 3 5 5 11 5 17l4 8c1 3-3 5-5 2l-4-8c-6 3-12 3-18 0l1 8c0 3-4 4-5 1l-4-11c-6-3-10-8-11-14-6 0-12-3-16-8-5 4-9 10-11 16-1 3-2 5-2 5l-3-1 2-8c-2 1-4 2-6 3-4 2-8 3-12 3z"/></svg>',
+  spino:'<svg viewBox="0 0 200 120" fill="currentColor"><path d="M181 26c-4-3-10-3-14 0-3-8-11-8-15-3-3-7-12-8-17-2-2 2-3 5-3 7-14-6-26 3-30 17-8-1-16 4-22 12l-1-16c0-3 4-4 5-1 2-9 8-16 16-20-3-2-5-6-4-9 1-4 5-6 9-5 2-8 9-13 17-13 2-6 8-9 14-7 1-4 6-6 10-4l-3 5c8 0 15 6 16 14 6 2 10 7 11 13 4-2 8-1 10 2-3 1-5 4-4 7-4 8-4 18-13 23-7 4-16 3-24 3-3 6-9 10-16 12l3 11c1 3-4 4-5 1l-4-12c-5 0-10-2-13-6l-1 11c0 3-4 3-5 0l-1-13c-6-1-11-6-11-13 0-4 2-8 5-10-4-4-5-9-3-14 3-8 12-11 20-9-3-9 2-18 11-20z"/></svg>'
+};
+
+const DINOS = [
+  {id:'trex',name:'Tyrannosaurus rex',short:'T. rex',sil:'theropod',pron:'tie-RAN-oh-SORE-us',meaning:'“tyrant lizard king”',
+   rarity:'Legendary',period:'Late Cretaceous',mya:'68–66 million yrs',len:'12 m',ht:'4 m',weight:'8 t',diet:'Carnivore',
+   loc:'Hell Creek Formation, Montana, USA',lat:47.5,lon:-106.9,
+   about:'The apex predator of its age. T. rex had the strongest bite of any land animal ever measured — around 35,000 newtons, enough to crush bone. Fossils are almost entirely from western North America, where it hunted along ancient river floodplains.',
+   facts:['Bite force ~35,000 N — it ate bone and all','Forward-facing eyes gave it sharp binocular vision','The most complete skeleton, “Sue,” is in Chicago','Likely feathered as a juvenile']},
+  {id:'trice',name:'Triceratops horridus',short:'Triceratops',sil:'cerat',pron:'try-SERR-a-tops',meaning:'“three-horned face”',
+   rarity:'Uncommon',period:'Late Cretaceous',mya:'68–66 million yrs',len:'9 m',ht:'3 m',weight:'6 t',diet:'Herbivore',
+   loc:'Lance Formation, Wyoming, USA',lat:44.0,lon:-105.4,
+   about:'A tank of a plant-eater that shared its world — and probably its battles — with T. rex. Its massive frill and three horns were used for defence and likely display. Its skull is one of the largest of any land animal.',
+   facts:['Skull could reach 2.5 m — a third of its length','Had up to 800 teeth, constantly replaced','The frill may have flushed with colour to signal','Chewed tough cycads and palms with a beak']},
+  {id:'velo',name:'Velociraptor mongoliensis',short:'Velociraptor',sil:'raptor',pron:'veh-LOSS-ih-RAP-tor',meaning:'“swift thief”',
+   rarity:'Rare',period:'Late Cretaceous',mya:'75–71 million yrs',len:'2 m',ht:'0.5 m',weight:'15 kg',diet:'Carnivore',
+   loc:'Djadokhta Formation, Gobi Desert, Mongolia',lat:44.0,lon:103.0,
+   about:'Real Velociraptor was turkey-sized and feathered — nothing like the movies. A famous “Fighting Dinosaurs” fossil caught one locked in combat with a Protoceratops, buried alive by a collapsing dune ~75 million years ago.',
+   facts:['Only about the size of a turkey, fully feathered','Killed with a retractable sickle claw on each foot','Quill knobs on its arm bones prove it had feathers','Hunted in the ancient dunes of central Asia']},
+  {id:'stego',name:'Stegosaurus stenops',short:'Stegosaurus',sil:'stego',pron:'STEG-oh-SORE-us',meaning:'“roof lizard”',
+   rarity:'Uncommon',period:'Late Jurassic',mya:'155–145 million yrs',len:'9 m',ht:'4 m',weight:'5 t',diet:'Herbivore',
+   loc:'Morrison Formation, Colorado, USA',lat:39.1,lon:-108.5,
+   about:'Instantly recognisable for the double row of plates along its back and the spiked “thagomizer” tail. The plates likely controlled body temperature and signalled to rivals. Its brain was famously tiny for its size.',
+   facts:['Tail spikes are nicknamed the “thagomizer”','Back plates may have flushed red to warn rivals','Brain the size of a walnut in a bus-sized body','Roamed the same Jurassic plains as Allosaurus']},
+  {id:'brach',name:'Brachiosaurus altithorax',short:'Brachiosaurus',sil:'sauropod',pron:'BRACK-ee-oh-SORE-us',meaning:'“arm lizard”',
+   rarity:'Rare',period:'Late Jurassic',mya:'154–153 million yrs',len:'22 m',ht:'12 m',weight:'40 t',diet:'Herbivore',
+   loc:'Morrison Formation, Colorado, USA',lat:39.1,lon:-108.7,
+   about:'Unusual among sauropods for its giraffe-like build — longer front legs raised its head as high as a four-storey building. It fed on the tops of conifers other dinosaurs couldn’t reach.',
+   facts:['Nostrils sat high on its head, not the snout','Front legs were longer than the back — rare in sauropods','Could browse foliage 12 m off the ground','Its name honours those long fore-“arms”']},
+  {id:'spino',name:'Spinosaurus aegyptiacus',short:'Spinosaurus',sil:'spino',pron:'SPINE-oh-SORE-us',meaning:'“spine lizard”',
+   rarity:'Legendary',period:'Cretaceous',mya:'99–93 million yrs',len:'15 m',ht:'5 m',weight:'12 t',diet:'Piscivore',
+   loc:'Kem Kem Beds, Morocco',lat:31.0,lon:-4.0,
+   about:'The largest predatory dinosaur known — even longer than T. rex — and the first found to be semi-aquatic. Its paddle-like tail and dense bones suggest it hunted fish in the great rivers of Cretaceous North Africa.',
+   facts:['Longer than T. rex — up to 15 m','A 1.8 m sail rose from its back','A paddle tail made it a swimmer, not just a wader','Original fossils were destroyed in WWII bombing']},
+  {id:'anky',name:'Ankylosaurus magniventris',short:'Ankylosaurus',sil:'anky',pron:'ang-KY-loh-SORE-us',meaning:'“fused lizard”',
+   rarity:'Uncommon',period:'Late Cretaceous',mya:'68–66 million yrs',len:'8 m',ht:'1.7 m',weight:'6 t',diet:'Herbivore',
+   loc:'Hell Creek Formation, Montana, USA',lat:47.2,lon:-107.1,
+   about:'A living fortress. Armour plates covered its back and even its eyelids, and a bony club at the end of its tail could swing hard enough to break the leg bones of an attacking predator.',
+   facts:['Tail club could shatter a predator’s bones','Even its eyelids were armoured with bone','Wide gut fermented tough, low-growing plants','Lived right up to the asteroid impact']},
+  {id:'ptera',name:'Pteranodon longiceps',short:'Pteranodon',sil:'ptero',pron:'teh-RAN-oh-don',meaning:'“toothless wing”',
+   rarity:'Rare',period:'Late Cretaceous',mya:'88–80 million yrs',len:'7 m span',ht:'1.8 m',weight:'25 kg',diet:'Piscivore',
+   loc:'Niobrara Formation, Kansas, USA',lat:38.8,lon:-98.3,
+   about:'Not a dinosaur but a flying reptile — a pterosaur — that soared over the shallow sea covering North America. Its wings spanned up to 7 m and it likely snatched fish from the surface like a giant seabird.',
+   facts:['Technically a pterosaur, not a dinosaur','Wingspan up to 7 m — wider than a car','Toothless beak scooped fish from the sea','The head crest may have steered it in flight']},
+  {id:'allo',name:'Allosaurus fragilis',short:'Allosaurus',sil:'theropod',pron:'AL-oh-SORE-us',meaning:'“different lizard”',
+   rarity:'Uncommon',period:'Late Jurassic',mya:'155–145 million yrs',len:'9 m',ht:'3 m',weight:'2 t',diet:'Carnivore',
+   loc:'Morrison Formation, Utah, USA',lat:39.3,lon:-110.7,
+   about:'The dominant Jurassic predator of North America, tens of millions of years before T. rex. It may have used its upper jaw like a hatchet, striking prey with its serrated teeth in fast, slashing attacks.',
+   facts:['Hunted Stegosaurus and young sauropods','Attacked by swinging its jaw like a hatchet','A quarry in Utah holds 46+ individuals','Had short brow horns above its eyes']},
+  {id:'para',name:'Parasaurolophus walkeri',short:'Parasaurolophus',sil:'hadro',pron:'PAIR-a-SORE-OL-oh-fus',meaning:'“near-crested lizard”',
+   rarity:'Rare',period:'Late Cretaceous',mya:'76–73 million yrs',len:'10 m',ht:'5 m',weight:'2.5 t',diet:'Herbivore',
+   loc:'Dinosaur Park Formation, Alberta, Canada',lat:51.0,lon:-111.5,
+   about:'A duck-billed dinosaur famous for the long, hollow tube-crest curving off its skull. Air passing through it may have produced a low, resonant call — like a living brass instrument echoing across the herd.',
+   facts:['Hollow crest could trumpet a low, deep call','Crest tubes could exceed a metre in length','Walked on two legs or four to browse','Hundreds of teeth ground up tough plants']},
+  {id:'diplo',name:'Diplodocus carnegii',short:'Diplodocus',sil:'sauropod',pron:'dip-LOD-oh-kus',meaning:'“double beam”',
+   rarity:'Uncommon',period:'Late Jurassic',mya:'154–152 million yrs',len:'26 m',ht:'5 m',weight:'15 t',diet:'Herbivore',
+   loc:'Morrison Formation, Wyoming, USA',lat:43.0,lon:-108.2,
+   about:'One of the longest dinosaurs known, most of it neck and whip-like tail. That tail could have been cracked like a bullwhip — possibly breaking the sound barrier to warn off rivals or predators.',
+   facts:['Up to 26 m long — much of it tail','Its whip tail may have cracked past the sound barrier','Peg-like teeth stripped leaves from branches','Casts of “Dippy” stand in museums worldwide']},
+  {id:'galli',name:'Gallimimus bullatus',short:'Gallimimus',sil:'raptor',pron:'GAL-ih-MIME-us',meaning:'“chicken mimic”',
+   rarity:'Common',period:'Late Cretaceous',mya:'70 million yrs',len:'6 m',ht:'2 m',weight:'440 kg',diet:'Omnivore',
+   loc:'Nemegt Formation, Gobi Desert, Mongolia',lat:43.5,lon:100.5,
+   about:'A long-legged “ostrich dinosaur” built for speed, sprinting across the Gobi at perhaps 50 km/h. Its toothless beak and comb-like jaw edges suggest it filtered small food or grazed on plants and insects.',
+   facts:['One of the fastest dinosaurs — up to ~50 km/h','Toothless beak may have filter-fed','Big eyes suggest keen daytime vision','Ran the same deserts as Velociraptor']}
+];
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+const store = {
+  get caught(){try{return new Set(JSON.parse(localStorage.getItem('dg_caught')||'[]'))}catch{return new Set()}},
+  set caught(s){localStorage.setItem('dg_caught',JSON.stringify([...s]))}
+};
+let caught = store.caught;
+let spawns = [];           // {dino, bearing, distance, capturable}
+let activeSpawn = null;
+let heading = null;        // compass heading in degrees
+let userPos = null;        // {lat,lon}
+let cameraStream = null;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const rarityRank = {Common:0,Uncommon:1,Rare:2,Legendary:3};
+
+/* =========================================================================
+   NAVIGATION
+   ========================================================================= */
+function show(screen){
+  $$('.screen').forEach(s=>s.classList.toggle('active', s.id===screen));
+  $$('.tab').forEach(t=>{
+    const g=t.dataset.go;
+    t.classList.toggle('active',(g===screen)||(g==='radar'&&screen==='radar'));
+  });
+  if(screen==='radar') drawRadar();
+  if(screen==='dex') renderDex();
+  if(screen==='ar') startCamera();
+  else stopCamera();
+}
+
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{
+  const g=t.dataset.go;
+  if(g==='hunt'){ huntNearest(); }
+  else show(g);
+}));
+
+$('#begin-btn').addEventListener('click', begin);
+$('#ar-back').addEventListener('click', ()=>show('radar'));
+$('#rescan-btn').addEventListener('click', ()=>{ generateSpawns(); drawRadar(); renderNearby(); });
+
+/* =========================================================================
+   START / permissions
+   ========================================================================= */
+$('#start-dino').innerHTML = SIL.theropod;
+
+async function begin(){
+  // Location
+  requestLocation();
+  // iOS motion permission must be triggered by a user gesture
+  if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+    try{ const r=await DeviceOrientationEvent.requestPermission(); if(r==='granted') listenOrientation(); }
+    catch{ /* ignore */ }
+  } else {
+    listenOrientation();
+  }
+  generateSpawns();
+  show('radar');
+  renderNearby();
+}
+
+function requestLocation(){
+  if(!navigator.geolocation){ setGps(false); return; }
+  navigator.geolocation.watchPosition(
+    p=>{ userPos={lat:p.coords.latitude,lon:p.coords.longitude}; setGps(true);
+         $('#radar-coord').textContent = fmtCoord(userPos.lat,userPos.lon); },
+    ()=>{ setGps(false); },
+    {enableHighAccuracy:true,maximumAge:5000,timeout:8000}
+  );
+}
+function setGps(live){
+  const d=$('#gps-dot'), v=$('#gps-val');
+  if(live){ d.classList.remove('warn'); d.textContent='● GPS'; v.textContent='LIVE'; }
+  else{ d.classList.add('warn'); d.textContent='● GPS'; v.textContent='SIM'; $('#radar-coord').textContent='sim field'; }
+}
+function fmtCoord(la,lo){
+  const a=Math.abs(la).toFixed(3)+(la>=0?'N':'S');
+  const b=Math.abs(lo).toFixed(3)+(lo>=0?'E':'W');
+  return a+' '+b;
+}
+
+/* orientation / compass */
+function listenOrientation(){
+  window.addEventListener('deviceorientation', e=>{
+    let h=null;
+    if(e.webkitCompassHeading!=null) h=e.webkitCompassHeading;
+    else if(e.alpha!=null) h=360-e.alpha;
+    if(h!=null){ heading=(h+360)%360; }
+  }, true);
+}
+
+/* =========================================================================
+   SPAWNS
+   ========================================================================= */
+function weightedPick(){
+  // rarer = less frequent
+  const w = DINOS.map(d=>({d, w: ({Common:8,Uncommon:5,Rare:2.4,Legendary:1})[d.rarity]}));
+  const total = w.reduce((s,x)=>s+x.w,0);
+  let r=Math.random()*total;
+  for(const x of w){ if((r-=x.w)<=0) return x.d; }
+  return DINOS[0];
+}
+function generateSpawns(){
+  const n = 4 + Math.floor(Math.random()*3); // 4–6
+  spawns = [];
+  const used=new Set();
+  for(let i=0;i<n;i++){
+    let d=weightedPick(), guard=0;
+    while(used.has(d.id) && guard++<10) d=weightedPick();
+    used.add(d.id);
+    spawns.push({
+      dino:d,
+      bearing: Math.round(Math.random()*360),
+      distance: 40 + Math.round(Math.random()*180) // 40–220 m
+    });
+  }
+  spawns.sort((a,b)=>a.distance-b.distance);
+}
+
+/* =========================================================================
+   RADAR
+   ========================================================================= */
+const canvas = $('#radar-canvas');
+const ctx = canvas.getContext('2d');
+let sweep = 0;
+const MAX_RANGE = 240;
+
+function drawRadar(){
+  const W=canvas.width, cx=W/2, cy=W/2, R=W/2-8;
+  ctx.clearRect(0,0,W,W);
+  // rings
+  ctx.strokeStyle='rgba(140,106,50,.35)';
+  for(let i=1;i<=4;i++){ ctx.beginPath();ctx.arc(cx,cy,R*i/4,0,Math.PI*2);ctx.lineWidth=1;ctx.stroke(); }
+  // crosshair
+  ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);
+  ctx.strokeStyle='rgba(140,106,50,.22)';ctx.stroke();
+  // range labels
+  ctx.fillStyle='rgba(184,173,150,.55)';ctx.font='500 18px "JetBrains Mono",monospace';ctx.textAlign='center';
+  ctx.fillText('60m', cx, cy-R/4+6);
+  ctx.fillText('240m', cx, cy-R+44);
+  // N marker
+  ctx.fillStyle='rgba(242,167,59,.9)';ctx.font='700 22px "JetBrains Mono",monospace';
+  ctx.fillText('N', cx, cy-R+18);
+  // sweep
+  const grad=ctx.createConicGradient ? null : null;
+  ctx.save();
+  ctx.translate(cx,cy);ctx.rotate(sweep);
+  const g=ctx.createLinearGradient(0,0,R,0);
+  g.addColorStop(0,'rgba(242,167,59,.30)');g.addColorStop(1,'rgba(242,167,59,0)');
+  ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,R,-0.5,0);ctx.closePath();ctx.fillStyle=g;ctx.fill();
+  ctx.strokeStyle='rgba(242,167,59,.8)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(R,0);ctx.stroke();
+  ctx.restore();
+  // center
+  ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);ctx.fillStyle='#efe6d2';ctx.fill();
+  ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);ctx.strokeStyle='rgba(239,230,210,.5)';ctx.lineWidth=1.5;ctx.stroke();
+  // blips — bearing relative to heading so N is up when compass live
+  const now=performance.now();
+  const rot = (heading!=null? heading : 0) * Math.PI/180;
+  spawns.forEach((s,i)=>{
+    const ang = (s.bearing*Math.PI/180) - rot - Math.PI/2;
+    const rad = Math.min(s.distance,MAX_RANGE)/MAX_RANGE*R;
+    const x=cx+Math.cos(ang)*rad, y=cy+Math.sin(ang)*rad;
+    const col = rarColor(s.dino.rarity);
+    const pulse = 0.5+0.5*Math.sin(now/380 + i);
+    ctx.beginPath();ctx.arc(x,y,10+pulse*5,0,Math.PI*2);ctx.fillStyle=hexA(col,.18);ctx.fill();
+    ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+  });
+}
+function rarColor(r){return {Common:'#5fa463',Uncommon:'#f2a73b',Rare:'#9b7fd4',Legendary:'#e4572e'}[r];}
+function hexA(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
+
+function animRadar(){ sweep=(sweep+0.02)%(Math.PI*2); if($('#radar').classList.contains('active')) drawRadar(); requestAnimationFrame(animRadar); }
+requestAnimationFrame(animRadar);
+
+/* nearby list */
+function renderNearby(){
+  const list=$('#nearby-list');
+  $('#nearby-count').textContent = spawns.length+' detected';
+  if(!spawns.length){ list.innerHTML='<div class="empty">No specimens in range. Rescan to sweep the area again.</div>'; return; }
+  list.innerHTML = spawns.map((s,i)=>{
+    const d=s.dino;
+    return `<button class="track-card" data-i="${i}">
+      <div class="sil" style="color:${rarColor(d.rarity)}">${SIL[d.sil]}</div>
+      <div class="info">
+        <div class="nm">${d.short}</div>
+        <div class="meta"><span class="rar ${d.rarity}">${d.rarity}</span><span>${compass(s.bearing)}</span><span>${d.period}</span></div>
+      </div>
+      <div class="dist"><b>${s.distance}m</b><small>Track</small></div>
+    </button>`;
+  }).join('');
+  $$('#nearby-list .track-card').forEach(b=>b.addEventListener('click',()=>openEncounter(spawns[+b.dataset.i])));
+}
+function compass(b){const dirs=['N','NE','E','SE','S','SW','W','NW'];return dirs[Math.round(b/45)%8];}
+
+function huntNearest(){
+  if(!spawns.length){ generateSpawns(); renderNearby(); }
+  if(spawns.length){ openEncounter(spawns[0]); }
+  else show('radar');
+}
+
+/* =========================================================================
+   AR ENCOUNTER
+   ========================================================================= */
+async function startCamera(){
+  const video=$('#ar-video'), fb=$('#ar-fallback');
+  if(cameraStream){ video.style.display='block'; fb.style.display='none'; return; }
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    video.srcObject=cameraStream; video.style.display='block'; fb.style.display='none';
+  }catch{
+    video.style.display='none'; fb.style.display='block';
+  }
+}
+function stopCamera(){
+  if(cameraStream){ cameraStream.getTracks().forEach(t=>t.stop()); cameraStream=null; }
+  const v=$('#ar-video'); if(v) v.srcObject=null;
+}
+
+function openEncounter(spawn){
+  activeSpawn = {...spawn};
+  const d = spawn.dino;
+  $('#ar-name').textContent = d.short;
+  $('#ar-sub').textContent = d.rarity.toUpperCase()+' · '+d.period;
+  $('#ar-dino').innerHTML = SIL[d.sil];
+  $('#ar-dino').style.color = tint(d.rarity);
+  $('#capture-card').classList.remove('show');
+  show('ar');
+  updateAR();
+}
+function tint(rarity){ return {Common:'#22180f',Uncommon:'#2a1d0f',Rare:'#241830',Legendary:'#2c1710'}[rarity]||'#241811'; }
+
+$('#approach-btn').addEventListener('click', ()=>{
+  if(!activeSpawn) return;
+  activeSpawn.distance = Math.max(5, activeSpawn.distance - (18+Math.floor(Math.random()*14)));
+  navigator.vibrate && navigator.vibrate(15);
+  updateAR();
+});
+$('#capture-btn').addEventListener('click', capture);
+
+function updateAR(){
+  if(!activeSpawn) return;
+  const dist = activeSpawn.distance;
+  $('#ar-dist').textContent = dist+' m';
+  const pct = Math.max(0, Math.min(100, (1-(dist-5)/235)*100));
+  $('#ar-range').style.width = pct+'%';
+  // heading readout
+  if(heading!=null){ $('#ar-heading-lbl').textContent='HEADING'; $('#ar-heading').textContent=Math.round(heading)+'°'; }
+  else { $('#ar-heading-lbl').textContent='BEARING'; $('#ar-heading').textContent=compass(activeSpawn.bearing); }
+  // dino size grows as you approach
+  const scale = Math.max(0.5, Math.min(2.4, 60/Math.max(dist,6)));
+  const w = 120*scale;
+  const dino=$('#ar-dino');
+  dino.style.width = w+'px'; dino.style.height = w*0.6+'px';
+  // horizontal placement: if compass live, offset by bearing difference
+  let offset = 0;
+  if(heading!=null){
+    let diff=((activeSpawn.bearing-heading+540)%360)-180; // -180..180
+    offset = Math.max(-45, Math.min(45, diff)); // clamp into view %
+    dino.style.opacity = Math.abs(diff)>60 ? '0.25':'1';
+  } else { dino.style.opacity='1'; }
+  dino.style.left = (50+offset*0.9)+'%';
+  // capture button state
+  const btn=$('#capture-btn');
+  if(dist<=15){ btn.disabled=false; btn.textContent='◎ Capture'; }
+  else { btn.disabled=true; btn.textContent='Get closer…'; }
+}
+
+function capture(){
+  if(!activeSpawn) return;
+  const d=activeSpawn.dino;
+  $('#flash').classList.remove('go'); void $('#flash').offsetWidth; $('#flash').classList.add('go');
+  navigator.vibrate && navigator.vibrate([20,40,60]);
+  // add to dex
+  caught.add(d.id); store.caught=caught; updateCaughtCount();
+  // remove from spawns
+  spawns = spawns.filter(s=>s.dino.id!==d.id);
+  // success card
+  setTimeout(()=>{
+    $('#cap-sil').innerHTML = SIL[d.sil];
+    $('#cap-name').textContent = d.short;
+    $('#cap-latin').textContent = d.name;
+    $('#cap-fact').textContent = d.facts[0]+'.';
+    $('#capture-card').classList.add('show');
+  }, 260);
+  $('#cap-view').onclick = ()=>{ $('#capture-card').classList.remove('show'); openDetail(d.id); };
+}
+
+/* =========================================================================
+   DEX + DETAIL
+   ========================================================================= */
+function updateCaughtCount(){
+  $('#caught-val').textContent = caught.size+'/'+DINOS.length;
+}
+function renderDex(){
+  const grid=$('#dex-grid');
+  const pct = Math.round(caught.size/DINOS.length*100);
+  $('#dex-pct').textContent = pct+'%';
+  const sorted=[...DINOS].sort((a,b)=>rarityRank[a.rarity]-rarityRank[b.rarity]);
+  grid.innerHTML = sorted.map((d,i)=>{
+    const owned = caught.has(d.id);
+    const num = String(DINOS.indexOf(d)+1).padStart(2,'0');
+    return `<button class="dex-cell ${owned?'owned':'locked'}" data-id="${d.id}">
+      <span class="num">#${num}</span>
+      <span class="rdot" style="background:${rarColor(d.rarity)}"></span>
+      <span class="sil">${SIL[d.sil]}</span>
+      <span class="lbl">${owned? d.short : '???'}</span>
+    </button>`;
+  }).join('');
+  $$('#dex-grid .dex-cell').forEach(c=>c.addEventListener('click',()=>{
+    const d=DINOS.find(x=>x.id===c.dataset.id);
+    if(caught.has(d.id)) openDetail(d.id);
+    else { c.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200}); }
+  }));
+}
+
+function worldMapSVG(lat,lon){
+  const W=320,H=170;
+  const x=(lo)=> (lo+180)/360*W;
+  const y=(la)=> (90-la)/180*H;
+  const conts=[[40,-100,42,26],[-15,-58,20,34],[50,15,20,14],[8,20,26,40],[48,90,54,34],[-25,134,24,16],[-80,0,60,12]];
+  const blobs=conts.map(([la,lo,rw,rh])=>`<ellipse cx="${x(lo).toFixed(1)}" cy="${y(la).toFixed(1)}" rx="${rw}" ry="${rh}" fill="#2e2416"/>`).join('');
+  const mx=x(lon).toFixed(1), my=y(lat).toFixed(1);
+  // graticule
+  let grat='';
+  for(let i=1;i<6;i++) grat+=`<line x1="0" y1="${H*i/6}" x2="${W}" y2="${H*i/6}" stroke="rgba(140,106,50,.16)"/>`;
+  for(let i=1;i<12;i++) grat+=`<line x1="${W*i/12}" y1="0" x2="${W*i/12}" y2="${H}" stroke="rgba(140,106,50,.16)"/>`;
+  return `<svg class="worldmap" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+    ${grat}${blobs}
+    <circle cx="${mx}" cy="${my}" r="12" fill="none" stroke="#e4572e" stroke-width="1.5" opacity=".5"><animate attributeName="r" values="6;14;6" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".8;0;.8" dur="2s" repeatCount="indefinite"/></circle>
+    <circle cx="${mx}" cy="${my}" r="4.5" fill="#f2a73b" stroke="#17120c" stroke-width="1.5"/>
+    <line x1="${mx}" y1="${my-9}" x2="${mx}" y2="${my+9}" stroke="#f2a73b" stroke-width="1" opacity=".6"/>
+    <line x1="${mx-9}" y1="${my}" x2="${mx+9}" y2="${my}" stroke="#f2a73b" stroke-width="1" opacity=".6"/>
+  </svg>`;
+}
+
+function openDetail(id){
+  const d=DINOS.find(x=>x.id===id);
+  const html=`
+   <div class="detail-hero">
+     <button class="detail-back" id="detail-back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg></button>
+     <div class="sil">${SIL[d.sil]}</div>
+     <h2>${d.short}</h2>
+     <div class="latin">${d.name}</div>
+     <div class="pron">/ ${d.pron} / · ${d.meaning}</div>
+     <div class="rar ${d.rarity}">${d.rarity}</div>
+   </div>
+   <div class="specs">
+     <div class="spec"><div class="k">Period</div><div class="v">${d.period}<small>${d.mya}</small></div></div>
+     <div class="spec"><div class="k">Diet</div><div class="v">${d.diet}</div></div>
+     <div class="spec"><div class="k">Length</div><div class="v">${d.len}<small>height ${d.ht}</small></div></div>
+     <div class="spec"><div class="k">Mass</div><div class="v">${d.weight}</div></div>
+   </div>
+   <div class="detail-body">
+     <h3>Field notes</h3>
+     <p>${d.about}</p>
+     <h3>Where it roamed</h3>
+     <div class="discovery">
+       ${worldMapSVG(d.lat,d.lon)}
+       <div class="loc">${d.loc}</div>
+       <div class="coord">${fmtCoord(d.lat,d.lon)} · discovery site</div>
+     </div>
+     <h3>Quick facts</h3>
+     <ul class="factlist">${d.facts.map(f=>`<li>${f}</li>`).join('')}</ul>
+   </div>`;
+  $('#detail-scroll').innerHTML=html;
+  $('#detail-scroll').scrollTop=0;
+  $('#detail-back').addEventListener('click', ()=> show(caught.size?'dex':'radar'));
+  show('detail');
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+updateCaughtCount();
+generateSpawns();
+// If already played before, let them jump straight in from Radar tab too.
+</script>
+</body>
+</html>
